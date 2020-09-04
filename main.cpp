@@ -1,14 +1,6 @@
-#include <iostream>
-using std::cin; using std::cout;
-#include <string>
-using std::string;
-#include "Board.h"
+#include "Game.h"
 int main()
 {
-    TicTacBoard testboard
-    ({  {Mark::blank, Mark::blank, Mark::blank}, 
-        {Mark::blank, Mark::blank, Mark::blank}, 
-        {Mark::blank, Mark::blank, Mark::blank}  });
-    print(cout, testboard);
+    tictactoe();
     return 0;
 }

@@ -1,103 +1,129 @@
+#ifndef TICTACBOARD_H
+#define TICTACBOARD_H
+#include "Enum.h"
 #include <iostream>
+#include <stdexcept>
+#include <string>
 #include <vector>
-#include <iterator>
 
-// used to represent players and symbols on board
-enum class Mark {blank, circle, cross};
-// used to represent the status of the game
-enum class GameStatus {ongoing, draw, winner};
+// main board class for Tic Tac Toe
+class Board {
+    // Friend declarations for auxiliary functions -------------------------------
+    friend std::ostream &print(std::ostream &os, const Board &board);
+    friend int static_eval(const Board &board, const Mark &maximizing_player);
+    friend std::vector<Move> gen_movelist(const Board &board);
 
-class TicTacBoard {
-    friend std::ostream &print(std::ostream &os, const TicTacBoard &board);
-    public:
     // type alias for internal board representation
     using Boardrep = std::vector<std::vector<Mark>>;
-    // Default constructor: blank 3x3 board, X goes first. 
-    TicTacBoard() = default;
-    // initialize board with a board savestate (define this outside of class body) 
-    TicTacBoard(const Boardrep &board_savestate) : board(board_savestate) 
-    {
-        // **add code to compute which player's turn it is on this board:
-        // if number of X == number of O, turn_player = X, 
-        // if number of X == number of O + 1, turn_player = O. Else, error.
-    }
-    // return true if able to successfully place a mark on an empty spot.
-    bool play_turn(const unsigned &col, const unsigned &row);
-    // returns the player of the current turn
-    const Mark &current_player() { return turn_player; }
-    // total number of marks drawn on the board (rounds)
-    int turns_played() { return Xmove_num + Omove_num; }
-    // winner of the game (blank if draw or ongoing);
-    const Mark &winner() { return winning_player; }
-    // present status of the game (ongoing, draw, winner declared)
-    GameStatus game_status();
 
+    // Interface --------------------------------------------------------------------------------------
+    public:
+    // Constructors ----------------------------------------------------------
+    // Default constructor: blank 3x3 board. 
+    Board() = default;
+
+    // initialize square board with a side length value
+    Board(const unsigned &length) : internal_board(length), side_length(length)
+    {
+        if (length > 0 && length <= max_length) {
+            for (auto &row : internal_board) {
+                for (unsigned num = 1; num <= length; ++num) {
+                    row.push_back(Mark::blank);
+                }
+            }
+        }
+        else {
+            throw std::runtime_error("A Board was initialized to a value that is less than or equal to 0, or larger than Board::max_length! length == " + std::to_string(length));
+        }
+    }
+
+    // Public Methods ------------------------------------------------------
+    bool play_turn(const std::string &algeb_move);
+    bool play_turn(const Move &plrmove);
+
+    // undo last played turn on board.
+    bool undo_move(const int num_moves = 1);
+
+    // returns the player of the current turn
+    const Mark &current_player() const { return turn_player; }
+
+    // total number of marks drawn on the board (rounds)
+    int moves_played() const { return Xmove_num + Omove_num; }
+
+    // winner of the game (blank if game status is draw or ongoing);
+    const Mark &winner() const { return winning_player; }
+
+    // present status of the game (ongoing, draw, winner declared)
+    inline GameState gamestatus() const;
+
+    // Implementation ---------------------------------------------------------------------
     private:
-    
-    // in-class initialize 3x3 board with blank spaces this vector should always be square (both vectors equal in size)
-    Boardrep board
-    {   {Mark::blank, Mark::blank, Mark::blank}, 
-        {Mark::blank, Mark::blank, Mark::blank}, 
-        {Mark::blank, Mark::blank, Mark::blank}   };
+    // maximum length that the board can be initialized to
+    static constexpr int max_length {26};
+
+    // in-class initialize 3x3 board with blank spaces. this vector should always be square (both vectors equal in size)
+    Boardrep internal_board {    {Mark::blank, Mark::blank, Mark::blank}, // bottom row of board
+                                 {Mark::blank, Mark::blank, Mark::blank}, // middle row of board
+                                 {Mark::blank, Mark::blank, Mark::blank}    }; // top row of board
 
     // side length of board (3 by default contructor)
-    const decltype(board.size()) side_length = board.size();
+    const Boardrep::size_type side_length = internal_board.size();
 
-    // return true if coordinate point exists within the bounds of the board, and the space is unoccupied
-    bool valid_point(const unsigned &col, const unsigned &row) const
-    {      
-        return (col <= side_length && row <= side_length && board[row][col] == Mark::blank);
-    }
-    bool board_full() { return (side_length * side_length == Xmove_num + Omove_num); }
+    // keep track of the moves played on the board so far.
+    std::vector<Move> played_moves;
 
-    bool check_win(const Mark &m);
-    // keep track of the number of moves played by each player on this board (max it should reach is the number of spaces on the board)
-    unsigned Xmove_num = 0;
-    unsigned Omove_num = 0;
+    // keep track of the number of moves played by each player on this board (max each should reach is half the number of spaces on the board)
+    int Xmove_num = 0;
+    int Omove_num = 0;
+
     // start with cross as the first player (turn_player means player of current turn)
     Mark turn_player = Mark::cross;
+
+    // the winner of the game, value is blank if no winner is declared (tie, ongoing)
     Mark winning_player = Mark::blank;
+
+    // Private Methods -------------------------------------------------
+    bool board_full() const { return (side_length * side_length == Xmove_num + Omove_num); }
+
+    // called by play_turn() to place the mark of the current player at the specified coordinate.
+    bool place_mark(const unsigned &row, const unsigned &col);
+
+    // return true if coordinate point exists within the bounds of the board, and the space is unoccupied
+    bool valid_point(const unsigned &row, const unsigned &col) const
+    {      
+        return (row < side_length && col < side_length && internal_board[row][col] == Mark::blank);
+    }
+    bool valid_move(const Move &move) const
+    {      
+        return valid_point(move.row() - 1, move.col() - 1);
+    }
+
+    // return true if the mark passed as an argument has a winning row.
+    bool check_win(const Mark &m) const;
+
+    bool check_recent_win(const Mark &m) const;
 };
 
-//std::ostream &print(std::ostream &os, TicTacBoard &board);
 
-inline Mark next_player(const Mark &m)
+inline GameState Board::gamestatus() const
 {
-    switch(m) {
-        case Mark::cross:
-            return Mark::circle;
-            break;
-
-        case Mark::circle:
-            return Mark::cross;
-            break;
-
-        case Mark::blank:
-            //error stuff...
-            return Mark::blank;
-            break;
-
-        default:
-            // assert for error I guess...
-            break;
+    if (winning_player == Mark::error || turn_player == Mark::error) {
+        return GameState::error;
+    }
+    else {
+        if (winning_player == Mark::blank) {
+            if (board_full()) {
+                return GameState::draw;
+            }
+            else {
+                return GameState::ongoing;
+            }
+        }
+        else {
+            return GameState::winner;
+        }
     }
 }
 
-inline char marktochar(const Mark &m)
-{
-    switch(m) {
-        case Mark::blank:
-            return '-';
-            break;
-        case Mark::circle:
-            return 'O';
-            break;
-        case Mark::cross:
-            return 'X';
-            break;
-        default:
-            // error stuff... maybe assert.
-            return 'E';
-            break; 
-    }
-}
+
+#endif
